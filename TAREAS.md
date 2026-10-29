@@ -7,6 +7,8 @@
 - [ ] **10.** En el menú de áreas elegir "Tribunal de Casación Penal PBA (TCPBA)" → "Buscar fallos (JUBA)", buscar por ejemplo `legitima defensa` (con Sala "Todas" y después con una sala) y comprobar que los resultados coinciden con los que da JUBA en el navegador. En una tarjeta pulsar "Leer texto" y pasar fragmentos con ◀ ▶. Anotar acá cualquier diferencia con JUBA.
 - [ ] **12.** Abrir la app y mirar la luz "RED" (donde antes estaba GPU): con conexión tiene que quedar apagada (rojo oscuro) y decir "En línea". Desconectar internet y esperar hasta 30 segundos: tiene que titilar en rojo y decir "Sin bravo47 ni JUBA". Al volver la conexión, en 30 segundos se apaga sola.
 - [ ] **13.** Bajar `CONSULTOR-LEGAL.exe` de https://github.com/elcoprofago/CONSULTOR-LEGAL/releases/latest, guardarlo en una carpeta propia y abrirlo. En ⚙ → "Actualización" tiene que decir "Versión instalada: 1.0.0"; pulsar "Buscar actualización": tiene que responder "Ya tenés la última versión". Usar desde ahora ese `.exe` (cuando salga una versión nueva, ese mismo botón la instala).
+- [ ] **14.** Subir a https://www.virustotal.com (pestaña "File") el `CONSULTOR-LEGAL.exe` de la release v1.0.0 (https://github.com/elcoprofago/CONSULTOR-LEGAL/releases/tag/v1.0.0). Anotar acá cuántos motores lo marcan y cuáles (en particular si aparece "Microsoft"), y pegar el enlace del informe.
+- [ ] **15.** Solo si en la 14 lo marca Microsoft (o Windows Defender lo bloquea al abrirlo): pedir el desmarcado en https://www.microsoft.com/en-us/wdsi/filesubmission → "Software developer", con tu cuenta Microsoft, adjuntando el mismo `.exe` y eligiendo "Incorrectly detected as malware/malicious". Anotar acá el número de envío que te da Microsoft.
 
 ## Hecho
 
