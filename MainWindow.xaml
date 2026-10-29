@@ -145,6 +145,8 @@
                                 ToolTip="Página siguiente de resultados"/>
                         <ToggleButton x:Name="TglJson" Content="{}{ } JSON" Click="TglJson_Click" Margin="0,0,6,4"
                                       ToolTip="Ver la respuesta cruda del servidor"/>
+                        <Button x:Name="BtnLimpiarResultados" Content="Limpiar resultados" Click="BtnLimpiarResultados_Click"
+                                Margin="0,0,6,4" ToolTip="Borrar los resultados y el historial de Atrás"/>
                         <Button x:Name="BtnVerificarSeleccion" Content="Verificar cita seleccionada" Click="BtnVerificarSeleccion_Click"
                                 Margin="0,0,6,4"
                                 ToolTip="Seleccioná con el mouse un pasaje de un resultado y verificalo contra el texto oficial"/>

@@ -8,5 +8,6 @@
 - [ ] **4.** Exportar un resultado en TXT y en DOCX y abrir los dos archivos.
 - [ ] **5.** En la rueda (⚙) elegir "Con textura", cargar una imagen y comprobar que el fondo cambia.
 - [ ] **6.** Pulsar "Desacoplar" en el Log, mover la ventana, cerrar la app y volver a abrirla: el log tiene que aparecer donde quedó.
+- [ ] **7.** Hacer una consulta y pulsar "Limpiar resultados": el panel tiene que quedar vacío y los botones Atrás, Fragmento y Página desactivados.
 
 ## Hecho

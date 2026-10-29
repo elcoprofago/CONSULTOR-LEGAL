@@ -39,6 +39,20 @@ namespace ConsultorLegal
         // Claves que solo meten ruido en la tarjeta (siguen en la vista JSON).
         private static readonly HashSet<string> ClavesOcultas = new() { "sha256", "ficha_id_opaco", "matcheo" };
 
+        private void BtnLimpiarResultados_Click(object sender, RoutedEventArgs e)
+        {
+            _historial.Clear();
+            PanelResultados.Children.Clear();
+            _textoActual.Clear();
+            _seleccion = "";
+            TxtJson.Text = "";
+            TxtTituloResultado.Text = "";
+            TxtFragmento.Text = "Fragmento –";
+            TxtPagina.Text = "Página –";
+            BtnAtras.IsEnabled = BtnFragAnt.IsEnabled = BtnFragSig.IsEnabled = BtnPagAnt.IsEnabled = BtnPagSig.IsEnabled = false;
+            _log.Info("Resultados limpiados.");
+        }
+
         private void Renderizar(Llamada llamada)
         {
             PanelResultados.Children.Clear();
