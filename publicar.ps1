@@ -54,7 +54,7 @@ if (Test-Path $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
 
 Paso "Publicando en $staging"
 dotnet publish (Join-Path $PSScriptRoot 'CONSULTOR-LEGAL.csproj') -c Release -r win-x64 --self-contained true `
-    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true `
     -p:PublishDir="$staging\" -nologo -v q
 if ($LASTEXITCODE -ne 0) { Fallar "dotnet publish falló (código $LASTEXITCODE)." }
 
