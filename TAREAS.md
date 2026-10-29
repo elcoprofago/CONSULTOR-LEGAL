@@ -3,6 +3,7 @@
 ## Pendientes
 
 - [ ] **3.** Seleccionar una frase de un resultado y pulsar "Verificar cita seleccionada".
+- [ ] **9.** Cerrar CONSULTOR-LEGAL y avisarme para recompilar (la app abierta bloquea el `.exe`). Después, abrir el texto de un fallo con varios fragmentos, escribir una palabra en el campo nuevo de arriba del panel y pulsar "Buscar en el resultado" (o Enter): tiene que listar los fragmentos donde aparece, con el contexto resaltado, y "Ir al fragmento" tiene que abrir ese fragmento con la palabra resaltada. En una lista sin fragmentos (por ejemplo, una búsqueda de normas), la misma búsqueda tiene que dejar visibles solo las tarjetas que la contienen. Con el campo vacío se vuelve a ver todo.
 
 ## Hecho
 

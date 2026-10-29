@@ -50,6 +50,8 @@ namespace ConsultorLegal
             TxtTituloResultado.Text = "";
             TxtFragmento.Text = "Fragmento –";
             TxtPagina.Text = "Página –";
+            TxtBuscarPanel.Text = TxtBuscarEstado.Text = "";
+            _cacheFragmentos.Clear();
             BtnAtras.IsEnabled = BtnFragAnt.IsEnabled = BtnFragSig.IsEnabled = BtnPagAnt.IsEnabled = BtnPagSig.IsEnabled = false;
             _log.Info("Resultados limpiados.");
         }
@@ -60,6 +62,9 @@ namespace ConsultorLegal
             _textoActual.Clear();
             _seleccion = "";
             _resaltar = TerminosBuscados(llamada.Argumentos);
+            string filtro = TxtBuscarPanel.Text.Trim();
+            if (filtro.Length > 0) _resaltar.Insert(0, filtro);
+            TxtBuscarEstado.Text = "";
             string tituloHerr = _herramientas.TryGetValue(llamada.Herramienta, out var h) ? h.Titulo : llamada.Herramienta;
             BtnAtras.IsEnabled = _historial.Count > 1;
 
@@ -113,7 +118,160 @@ namespace ConsultorLegal
                 TxtTituloResultado.Text = tituloHerr;
                 AgregarTarjeta("Respuesta", raiz.ToString(), null);
             }
+            if (_totalFragmentos == 0) FiltrarTarjetas(filtro);
             ScrollResultados.ScrollToTop();
+        }
+
+        // ================= Buscar dentro del resultado =================
+
+        private static readonly System.Globalization.CompareInfo CompEs = System.Globalization.CultureInfo.GetCultureInfo("es-AR").CompareInfo;
+        private const System.Globalization.CompareOptions SinTildesNiMayus =
+            System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace;
+
+        // Respuestas de fragmentos ya pedidas, para no repetir la descarga
+        // cuando se busca otra palabra en el mismo texto.
+        private readonly Dictionary<string, string> _cacheFragmentos = new();
+        private CancellationTokenSource? _cancelarBusqueda;
+
+        private void TxtBuscarPanel_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter) BtnBuscarPanel_Click(sender, e);
+        }
+
+        private async void BtnBuscarPanel_Click(object sender, RoutedEventArgs e)
+        {
+            if (_cancelarBusqueda != null) { _cancelarBusqueda.Cancel(); return; }
+            if (_historial.Count == 0) { TxtBuscarEstado.Text = "No hay resultado donde buscar."; return; }
+            var actual = _historial[^1];
+            string filtro = TxtBuscarPanel.Text.Trim();
+
+            // Sin fragmentos, o con el campo vacío: se filtran las tarjetas que ya están.
+            if (_totalFragmentos == 0 || filtro.Length == 0 || _cliente == null)
+            {
+                Renderizar(actual);
+                return;
+            }
+            if (_consultando) return;
+
+            _consultando = true;
+            _cancelarBusqueda = new CancellationTokenSource();
+            BtnBuscarPanel.Content = "Cancelar";
+            BtnConsultar.IsEnabled = false;
+            long total = _totalFragmentos, actualFrag = _fragmento;
+            var hallazgos = new List<(long fragmento, int cantidad, List<string> contextos)>();
+            try
+            {
+                for (long f = 1; f <= total; f++)
+                {
+                    TxtBuscarEstado.Text = $"Buscando… fragmento {f}/{total}";
+                    var args = (JsonObject)actual.Argumentos.DeepClone();
+                    args["fragmento"] = f;
+                    string clave = actual.Herramienta + args.ToJsonString();
+                    if (!_cacheFragmentos.TryGetValue(clave, out var texto))
+                    {
+                        if (f == actualFrag && !actual.EsError) texto = actual.Respuesta;
+                        else
+                        {
+                            var (t, esError) = await _cliente.LlamarAsync(actual.Herramienta, args, _cancelarBusqueda.Token);
+                            if (esError) { _log.Aviso($"El fragmento {f} no se pudo leer: {Resumir(t, 200)}"); continue; }
+                            texto = t;
+                        }
+                        _cacheFragmentos[clave] = texto;
+                    }
+                    var (cantidad, contextos) = Coincidencias(TextoPlano(texto), filtro);
+                    if (cantidad > 0) hallazgos.Add((f, cantidad, contextos));
+                }
+            }
+            catch (OperationCanceledException) { TxtBuscarEstado.Text = "Búsqueda cancelada."; return; }
+            catch (Exception ex) { _log.Error($"No se pudo completar la búsqueda: {ex.Message}"); TxtBuscarEstado.Text = "La búsqueda falló (ver Log)."; return; }
+            finally
+            {
+                _cancelarBusqueda = null;
+                _consultando = false;
+                BtnBuscarPanel.Content = "Buscar en el resultado";
+                BtnConsultar.IsEnabled = _herramientaActual != null;
+            }
+
+            MostrarHallazgos(actual, filtro, total, hallazgos);
+        }
+
+        private void MostrarHallazgos(Llamada actual, string filtro, long total, List<(long fragmento, int cantidad, List<string> contextos)> hallazgos)
+        {
+            PanelResultados.Children.Clear();
+            _textoActual.Clear();
+            _resaltar = new List<string> { filtro };
+            int suma = hallazgos.Sum(h => h.cantidad);
+            TxtTituloResultado.Text = $"\"{filtro}\" · {suma} coincidencias en {hallazgos.Count} de {total} fragmentos";
+            TxtBuscarEstado.Text = "";
+            foreach (var (f, cantidad, contextos) in hallazgos)
+            {
+                string cuerpo = string.Join("\n\n", contextos.Select(c => "… " + c + " …"));
+                if (cantidad > contextos.Count) cuerpo += $"\n\n(y {cantidad - contextos.Count} más en este fragmento)";
+                long destino = f;
+                AgregarTarjeta($"Fragmento {f} · {cantidad} coincidencia{(cantidad == 1 ? "" : "s")}", cuerpo,
+                    new() { ("Ir al fragmento", $"Abrir el fragmento {f} con \"{filtro}\" resaltado", async () => await RepetirConAsync("fragmento", destino)) });
+            }
+            if (hallazgos.Count == 0)
+                AgregarTarjeta("Sin coincidencias", $"\"{filtro}\" no aparece en ninguno de los {total} fragmentos.", null);
+            var volver = new List<(string, string, Action)> { ("Volver al resultado", "Ver de nuevo el fragmento que estaba abierto", () => Renderizar(actual)) };
+            AgregarTarjeta("Búsqueda en todos los fragmentos", "Vaciá el campo de búsqueda y pulsá el botón para dejar de resaltar.", volver, esMeta: true);
+            ScrollResultados.ScrollToTop();
+        }
+
+        // Sin fragmentos: se ocultan las tarjetas que no contienen el texto
+        // (la de "Información de la consulta" queda siempre).
+        private void FiltrarTarjetas(string filtro)
+        {
+            if (filtro.Length == 0) return;
+            int visibles = 0, total = 0;
+            for (int i = 0; i < PanelResultados.Children.Count && i < _textoActual.Count; i++)
+            {
+                var (t, c) = _textoActual[i];
+                if (t == "Información de la consulta") continue;
+                total++;
+                bool hay = CompEs.IndexOf(t + "\n" + c, filtro, SinTildesNiMayus) >= 0;
+                PanelResultados.Children[i].Visibility = hay ? Visibility.Visible : Visibility.Collapsed;
+                if (hay) visibles++;
+            }
+            TxtBuscarEstado.Text = $"\"{filtro}\": {visibles} de {total} tarjetas";
+        }
+
+        // Todo el texto de una respuesta JSON (los valores, no las claves).
+        private static string TextoPlano(string respuesta)
+        {
+            JsonNode? raiz;
+            try { raiz = JsonNode.Parse(respuesta); } catch { return respuesta; }
+            var sb = new StringBuilder();
+            void Juntar(JsonNode? n)
+            {
+                switch (n)
+                {
+                    case JsonObject o: foreach (var (_, v) in o) Juntar(v); break;
+                    case JsonArray a: foreach (var v in a) Juntar(v); break;
+                    case JsonValue v: sb.AppendLine(v.ToString()); break;
+                }
+            }
+            Juntar(raiz);
+            return sb.ToString();
+        }
+
+        private static (int cantidad, List<string> contextos) Coincidencias(string texto, string filtro, int maxContextos = 5)
+        {
+            var contextos = new List<string>();
+            int cantidad = 0, pos = 0;
+            while (pos < texto.Length)
+            {
+                int i = CompEs.IndexOf(texto, filtro, pos, SinTildesNiMayus);
+                if (i < 0) break;
+                cantidad++;
+                if (contextos.Count < maxContextos)
+                {
+                    int ini = Math.Max(0, i - 120), fin = Math.Min(texto.Length, i + filtro.Length + 120);
+                    contextos.Add(texto[ini..fin].Replace('\n', ' ').Replace('\r', ' ').Trim());
+                }
+                pos = i + Math.Max(1, filtro.Length);
+            }
+            return (cantidad, contextos);
         }
 
         private void ActualizarNavegacion(Llamada llamada, JsonNode? raiz, Herramienta? h)
