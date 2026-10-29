@@ -259,6 +259,7 @@ namespace ConsultorLegal
                     var h = Herramientas.Desde(t);
                     _herramientas[h.Nombre] = h;
                 }
+                foreach (var h in JubaTcp.Herramientas()) _herramientas[h.Nombre] = h;
 
                 string nombre = cliente.InfoServidor?["name"]?.ToString() ?? "?";
                 string version = cliente.InfoServidor?["version"]?.ToString() ?? "?";
@@ -618,7 +619,7 @@ namespace ConsultorLegal
             var reloj = Stopwatch.StartNew();
             try
             {
-                var (texto, esError) = await _cliente.LlamarAsync(llamada.Herramienta, llamada.Argumentos);
+                var (texto, esError) = await LlamarAsync(llamada.Herramienta, llamada.Argumentos);
                 llamada.Respuesta = texto;
                 llamada.EsError = esError;
                 if (esError) _log.Error($"El servidor rechazó la consulta ({reloj.ElapsedMilliseconds} ms): {Resumir(texto, 400)}");
@@ -640,6 +641,11 @@ namespace ConsultorLegal
                 Mouse.OverrideCursor = null;
             }
         }
+
+        // Las herramientas del Tribunal de Casación las resuelve la app contra
+        // JUBA; el resto va al servidor.
+        private Task<(string texto, bool esError)> LlamarAsync(string herramienta, JsonObject args, CancellationToken ct = default) =>
+            JubaTcp.EsPropia(herramienta) ? JubaTcp.LlamarAsync(herramienta, args, ct) : _cliente!.LlamarAsync(herramienta, args, ct);
 
         private static string ResumenRespuesta(string texto)
         {

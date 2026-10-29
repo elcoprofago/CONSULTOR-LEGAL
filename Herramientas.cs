@@ -39,7 +39,7 @@ namespace ConsultorLegal
     {
         public static readonly string[] OrdenGrupos =
         {
-            "Legislación", "Corte Suprema (CSJN)", "Suprema Corte PBA (SCBA)", "Tratados",
+            "Legislación", "Corte Suprema (CSJN)", "Suprema Corte PBA (SCBA)", JubaTcp.Grupo, "Tratados",
             "Boletines oficiales", "Tribunales y funcionarios", "Verificación", "Servidor", "Otras",
         };
 

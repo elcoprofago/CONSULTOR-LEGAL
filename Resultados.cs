@@ -172,7 +172,7 @@ namespace ConsultorLegal
                         if (f == actualFrag && !actual.EsError) texto = actual.Respuesta;
                         else
                         {
-                            var (t, esError) = await _cliente.LlamarAsync(actual.Herramienta, args, _cancelarBusqueda.Token);
+                            var (t, esError) = await LlamarAsync(actual.Herramienta, args, _cancelarBusqueda.Token);
                             if (esError) { _log.Aviso($"El fragmento {f} no se pudo leer: {Resumir(t, 200)}"); continue; }
                             texto = t;
                         }
@@ -454,7 +454,11 @@ namespace ConsultorLegal
                     }));
             }
 
-            if (Valor("id_juba") is string juba)
+            if (Valor("id_texto_tcpba") is string tcp && long.TryParse(tcp, out long idt))
+            {
+                if (herramienta != JubaTcp.Leer) Ir("Leer texto", "Texto completo del fallo en JUBA", JubaTcp.Leer, new JsonObject { ["id_texto"] = idt });
+            }
+            else if (Valor("id_juba") is string juba)
             {
                 if (herramienta != "obtener_fallo_scba") Ir("Ficha", "Ficha completa del fallo", "obtener_fallo_scba", new JsonObject { ["id_juba"] = juba });
                 if (herramienta != "leer_fallo_scba") Ir("Leer texto", "Texto completo del fallo", "leer_fallo_scba", new JsonObject { ["id_juba"] = juba });
