@@ -55,7 +55,7 @@ namespace ConsultorLegal
             {
                 ["name"] = Buscar,
                 ["description"] = "Busca sumarios del Tribunal de Casación Penal bonaerense en JUBA (juba.scba.gov.ar). " +
-                                  "Se busca en el texto del sumario y en las voces, o por número de causa. JUBA admite los operadores \"y\", \"o\" y \"no\", y el comodín *.",
+                                  "Se busca en el texto del sumario y en las voces, o por número de causa (con o sin punto de millares; también trae los fallos de la SCBA que citan esa causa de Casación en la carátula). JUBA admite los operadores \"y\", \"o\" y \"no\", y el comodín *.",
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",
@@ -126,6 +126,33 @@ namespace ConsultorLegal
             if (query.Length > 0) expresion += $" y {query}";
 
             using var http = NuevoCliente();
+            string html = await PaginaAsync(http, expresion, pagina, false, ct);
+
+            int total = Total(html);
+            var sumarios = new JsonArray();
+            if (total > (pagina - 1) * PorPagina)
+                foreach (var s in Sumarios(html)) sumarios.Add(s);
+
+            // Los fallos de la SCBA sobre una causa de Casación no llevan el
+            // número como Nro.Causa: lo citan en la carátula, a veces con punto
+            // de millares ("CAUSA N° 48.755 DEL TRIBUNAL DE CASACION"). JUBA
+            // los encuentra por los dígitos solos buscando en la carátula.
+            int revisiones = 0;
+            if (nro.Length > 0 && pagina == 1)
+                foreach (var s in await RevisionesAsync(http, nro, query, codigo, ct)) { sumarios.Add(s); revisiones++; }
+
+            return new JsonObject
+            {
+                ["fuente"] = "JUBA · Tribunal de Casación Penal PBA",
+                ["expresion"] = expresion,
+                ["total"] = total + revisiones,
+                ["hay_mas"] = offset + PorPagina < total,
+                ["sumarios"] = sumarios,
+            }.ToJsonString();
+        }
+
+        private static async Task<string> PaginaAsync(HttpClient http, string expresion, int pagina, bool caratula, CancellationToken ct)
+        {
             string formulario = await http.GetStringAsync(Base + "Busquedas.aspx", ct);
             var datos = CamposOcultos(formulario);
             datos[P + "TipoBusqueda"] = "rdbBusquedaIntegral";
@@ -133,6 +160,7 @@ namespace ConsultorLegal
             datos[P + "chkTextoSumario"] = "on";
             datos[P + "chkVoces"] = "on";
             datos[P + "chkTribunalEmisor"] = "on";
+            if (caratula) datos[P + "chkCaratula"] = "on";
             datos[P + "btnRealizarBusqueda"] = "Buscar";
             string html = await EnviarAsync(http, datos, ct);
 
@@ -143,22 +171,32 @@ namespace ConsultorLegal
                 pag[P + "ddlPaginaResultados"] = (pagina - 1).ToString();   // el selector cuenta desde 0
                 pag[P + "TipoBusqueda"] = "rdbBusquedaIntegral";
                 pag[P + "txtExpresionBusquedaIntegral"] = expresion;
+                if (caratula) pag[P + "chkCaratula"] = "on";
                 html = await EnviarAsync(http, pag, ct);
             }
+            return html;
+        }
 
-            int total = Total(html);
-            var sumarios = new JsonArray();
-            if (total > (pagina - 1) * PorPagina)
-                foreach (var s in Sumarios(html)) sumarios.Add(s);
-
-            return new JsonObject
+        private static async Task<List<JsonObject>> RevisionesAsync(HttpClient http, string nro, string query, string sala, CancellationToken ct)
+        {
+            string expresion = nro + (query.Length > 0 ? $" y {query}" : "");
+            // 48755 o 48.755, como número entero (no 148755 ni 487551).
+            var cita = new Regex(@"(?<![\d.])" + string.Join(@"\.?", nro.ToCharArray()) + @"(?!\.?\d)");
+            var lista = new List<JsonObject>();
+            for (int pagina = 1; pagina <= 3; pagina++)
             {
-                ["fuente"] = "JUBA · Tribunal de Casación Penal PBA",
-                ["expresion"] = expresion,
-                ["total"] = total,
-                ["hay_mas"] = offset + PorPagina < total,
-                ["sumarios"] = sumarios,
-            }.ToJsonString();
+                string html = await PaginaAsync(http, expresion, pagina, true, ct);
+                foreach (var s in Sumarios(html))
+                {
+                    string caratula = s["caratula"]?.ToString() ?? "", fallo = s["fallo"]?.ToString() ?? "";
+                    if (fallo.StartsWith("TC") || !caratula.Contains("CASACI", StringComparison.OrdinalIgnoreCase) || !cita.IsMatch(caratula)) continue;
+                    // "TCO003LP": JUBA a veces escribe la letra O por el cero.
+                    if (sala != Salas["Todas"] && !(s["tribunal_origen"]?.ToString() ?? "").Replace("TCO", "TC0").StartsWith(sala)) continue;
+                    lista.Add(s);
+                }
+                if (Total(html) <= pagina * PorPagina) break;
+            }
+            return lista;
         }
 
         private static async Task<string> EnviarAsync(HttpClient http, Dictionary<string, string> datos, CancellationToken ct)
@@ -193,7 +231,7 @@ namespace ConsultorLegal
                 var celdas = Regex.Matches(parte, @"<td class=""tdFilaRepeater(?:Der)?""[^>]*>(.*?)</td>", RegexOptions.Singleline)
                                   .Select(m => Limpio(m.Groups[1].Value)).ToList();
                 // celdas: materia, número, voces, texto, normas, ...
-                var fallos = Regex.Matches(parte, @"<br>\s*((?:TC\w*) [A-Z]{2} .*?)(?=<br><br>|</p>)", RegexOptions.Singleline)
+                var fallos = Regex.Matches(parte, @"<br>\s*([A-Z]{2,4}\w* [A-Z]{2} .*?)(?=<br><br>|</p>)", RegexOptions.Singleline)
                                   .Select(m => m.Groups[1].Value).ToList();
                 var s = new JsonObject
                 {

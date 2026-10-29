@@ -3,7 +3,9 @@
 ## Pendientes
 
 - [ ] **3.** Seleccionar una frase de un resultado y pulsar "Verificar cita seleccionada".
-- [ ] **9.** Cerrar CONSULTOR-LEGAL y avisarme para recompilar (la app abierta bloquea el `.exe`). Después, abrir el texto de un fallo con varios fragmentos, escribir una palabra en el campo nuevo de arriba del panel y pulsar "Buscar en el resultado" (o Enter): tiene que listar los fragmentos donde aparece, con el contexto resaltado, y "Ir al fragmento" tiene que abrir ese fragmento con la palabra resaltada. En una lista sin fragmentos (por ejemplo, una búsqueda de normas), la misma búsqueda tiene que dejar visibles solo las tarjetas que la contienen. Con el campo vacío se vuelve a ver todo.
+- [x] **9.** Cerrar CONSULTOR-LEGAL y avisarme para recompilar (la app abierta bloquea el `.exe`). Después, abrir el texto de un fallo con varios fragmentos, escribir una palabra en el campo nuevo de arriba del panel y pulsar "Buscar en el resultado" (o Enter): tiene que listar los fragmentos donde aparece, con el contexto resaltado, y "Ir al fragmento" tiene que abrir ese fragmento con la palabra resaltada. En una lista sin fragmentos (por ejemplo, una búsqueda de normas), la misma búsqueda tiene que dejar visibles solo las tarjetas que la contienen. Con el campo vacío se vuelve a ver todo.
+- [ ] **17.** Abrir `bin\Debug
+et8.0-windows\CONSULTOR-LEGAL.exe`, ir a "Tribunal de Casación Penal PBA (TCPBA)" → "Buscar fallos (JUBA)", dejar vacío el texto y escribir `48.755` en "Nro. de causa" (después probar `48755`, sin punto): en los dos casos tienen que salir los sumarios del fallo SCBA P 118217 (carátula "L. A. C. S/ RECURSO EXTRAORDINARIO…"). En una tarjeta, "Leer texto" tiene que abrir ese fallo. Con Sala "Sala III" también tiene que aparecer; con "Sala I", no.
 
 ## Hecho
 
