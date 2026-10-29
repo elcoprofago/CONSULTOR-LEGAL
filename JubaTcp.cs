@@ -42,14 +42,14 @@ namespace ConsultorLegal
             {
                 ["name"] = Buscar,
                 ["description"] = "Busca sumarios del Tribunal de Casación Penal bonaerense en JUBA (juba.scba.gov.ar). " +
-                                  "Se busca en el texto del sumario y en las voces, o por número de sumario. JUBA admite los operadores \"y\", \"o\" y \"no\", y el comodín *.",
+                                  "Se busca en el texto del sumario y en las voces, o por número de causa. JUBA admite los operadores \"y\", \"o\" y \"no\", y el comodín *.",
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",
                     ["properties"] = new JsonObject
                     {
                         ["query"] = new JsonObject { ["type"] = "string" },
-                        ["sumario"] = new JsonObject { ["type"] = "string", ["description"] = "Número de sumario de JUBA, por ejemplo B3258273." },
+                        ["causa"] = new JsonObject { ["type"] = "string", ["description"] = "Solo el número de la causa, sin letra ni extensión (por ejemplo 57099)." },
                         ["sala"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Salas.Keys.Select(k => (JsonNode)k).ToArray()), ["default"] = "Todas" },
                         ["offset"] = new JsonObject { ["type"] = "integer", ["default"] = 0 },
                     },
@@ -74,7 +74,7 @@ namespace ConsultorLegal
             buscar.Titulo = "Buscar fallos (JUBA)";
             leer.Titulo = "Leer texto del fallo";
             buscar.Campos.First(c => c.Nombre == "sala").Etiqueta = "Sala";
-            buscar.Campos.First(c => c.Nombre == "sumario").Etiqueta = "Nro. de sumario";
+            buscar.Campos.First(c => c.Nombre == "causa").Etiqueta = "Nro. de causa";
             return new[] { buscar, leer };
         }
 
@@ -102,14 +102,14 @@ namespace ConsultorLegal
         private static async Task<string> BuscarAsync(JsonObject args, CancellationToken ct)
         {
             string query = args["query"]?.ToString().Trim() ?? "";
-            string nro = Regex.Replace(args["sumario"]?.ToString() ?? "", @"[\s""]", "").ToUpperInvariant();
-            if (query.Length == 0 && nro.Length == 0) throw new ArgumentException("Falta el texto a buscar o el número de sumario.");
+            string nro = Regex.Replace(args["causa"]?.ToString() ?? "", @"\D", "");
+            if (query.Length == 0 && nro.Length == 0) throw new ArgumentException("Falta el texto a buscar o el número de causa.");
             string sala = args["sala"]?.ToString() ?? "Todas";
             if (!Salas.TryGetValue(sala, out var codigo)) throw new ArgumentException($"Sala desconocida: {sala}");
             long offset = Math.Max(0, args["offset"] is JsonNode o && long.TryParse(o.ToString(), out long v) ? v : 0);
             int pagina = (int)(offset / PorPagina) + 1;
             string expresion = codigo;
-            if (nro.Length > 0) expresion += $" y Nro.Sumario:\"{nro}\"";
+            if (nro.Length > 0) expresion += $" y Nro.Causa:{nro}";
             if (query.Length > 0) expresion += $" y {query}";
 
             using var http = NuevoCliente();
