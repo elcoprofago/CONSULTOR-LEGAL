@@ -456,7 +456,7 @@ namespace ConsultorLegal
 
             if (Valor("id_texto_tcpba") is string tcp && long.TryParse(tcp, out long idt))
             {
-                if (herramienta != JubaTcp.Leer) Ir("Leer texto", "Texto completo del fallo en JUBA", JubaTcp.Leer, new JsonObject { ["id_texto"] = idt });
+                if (herramienta != JubaTcp.Leer) Ir("Leer texto", "Texto completo del fallo en JUBA", JubaTcp.Leer, new JsonObject { ["id_juba"] = idt });
             }
             else if (Valor("id_juba") is string juba)
             {

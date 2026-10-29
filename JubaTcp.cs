@@ -42,14 +42,14 @@ namespace ConsultorLegal
             {
                 ["name"] = Buscar,
                 ["description"] = "Busca sumarios del Tribunal de Casación Penal bonaerense en JUBA (juba.scba.gov.ar). " +
-                                  "Se busca en el texto del sumario y en las voces. JUBA admite los operadores \"y\", \"o\" y \"no\", y el comodín *.",
+                                  "Se busca en el texto del sumario y en las voces, o por número de sumario. JUBA admite los operadores \"y\", \"o\" y \"no\", y el comodín *.",
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",
-                    ["required"] = new JsonArray("query"),
                     ["properties"] = new JsonObject
                     {
                         ["query"] = new JsonObject { ["type"] = "string" },
+                        ["sumario"] = new JsonObject { ["type"] = "string", ["description"] = "Número de sumario de JUBA, por ejemplo B3258273." },
                         ["sala"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Salas.Keys.Select(k => (JsonNode)k).ToArray()), ["default"] = "Todas" },
                         ["offset"] = new JsonObject { ["type"] = "integer", ["default"] = 0 },
                     },
@@ -62,10 +62,10 @@ namespace ConsultorLegal
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",
-                    ["required"] = new JsonArray("id_texto"),
+                    ["required"] = new JsonArray("id_juba"),
                     ["properties"] = new JsonObject
                     {
-                        ["id_texto"] = new JsonObject { ["type"] = "integer", ["description"] = "Número del texto completo en JUBA (idFallo)." },
+                        ["id_juba"] = new JsonObject { ["type"] = "integer", ["description"] = "Número del texto completo en JUBA (idFallo)." },
                         ["fragmento"] = new JsonObject { ["type"] = "integer", ["default"] = 1 },
                     },
                 },
@@ -74,7 +74,7 @@ namespace ConsultorLegal
             buscar.Titulo = "Buscar fallos (JUBA)";
             leer.Titulo = "Leer texto del fallo";
             buscar.Campos.First(c => c.Nombre == "sala").Etiqueta = "Sala";
-            leer.Campos.First(c => c.Nombre == "id_texto").Etiqueta = "Id del texto (JUBA)";
+            buscar.Campos.First(c => c.Nombre == "sumario").Etiqueta = "Nro. de sumario";
             return new[] { buscar, leer };
         }
 
@@ -102,12 +102,15 @@ namespace ConsultorLegal
         private static async Task<string> BuscarAsync(JsonObject args, CancellationToken ct)
         {
             string query = args["query"]?.ToString().Trim() ?? "";
-            if (query.Length == 0) throw new ArgumentException("Falta el texto a buscar.");
+            string nro = Regex.Replace(args["sumario"]?.ToString() ?? "", @"[\s""]", "").ToUpperInvariant();
+            if (query.Length == 0 && nro.Length == 0) throw new ArgumentException("Falta el texto a buscar o el número de sumario.");
             string sala = args["sala"]?.ToString() ?? "Todas";
             if (!Salas.TryGetValue(sala, out var codigo)) throw new ArgumentException($"Sala desconocida: {sala}");
             long offset = Math.Max(0, args["offset"] is JsonNode o && long.TryParse(o.ToString(), out long v) ? v : 0);
             int pagina = (int)(offset / PorPagina) + 1;
-            string expresion = $"{codigo} y {query}";
+            string expresion = codigo;
+            if (nro.Length > 0) expresion += $" y Nro.Sumario:\"{nro}\"";
+            if (query.Length > 0) expresion += $" y {query}";
 
             using var http = NuevoCliente();
             string formulario = await http.GetStringAsync(Base + "Busquedas.aspx", ct);
@@ -221,8 +224,8 @@ namespace ConsultorLegal
 
         private static async Task<string> LeerAsync(JsonObject args, CancellationToken ct)
         {
-            if (args["id_texto"] is not JsonNode n || !long.TryParse(n.ToString(), out long id) || id <= 0)
-                throw new ArgumentException("Falta el id del texto (el número que aparece como \"Id texto tcpba\" en los resultados de la búsqueda).");
+            if (args["id_juba"] is not JsonNode n || !long.TryParse(n.ToString(), out long id) || id <= 0)
+                throw new ArgumentException("Falta el Id JUBA del fallo (el número que aparece como \"Id texto tcpba\" en los resultados de la búsqueda).");
             long fragmento = args["fragmento"] is JsonNode f && long.TryParse(f.ToString(), out long fv) ? fv : 1;
 
             if (!Textos.TryGetValue(id, out var leido))
