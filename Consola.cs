@@ -60,26 +60,8 @@ namespace ConsultorLegal
 
         public void Cierre() => Linea(new Tramo("  └" + new string('─', 60), Tenue));
 
-        // Letras de bloque con degradé "fuego" (FF4D4D → FFBA30), como el
-        // banner del Actualizador.
         public void Banner(string version)
         {
-            string[] arte =
-            {
-                "  ██╗     ███████╗ ██████╗  █████╗ ██╗     ",
-                "  ██║     ██╔════╝██╔════╝ ██╔══██╗██║     ",
-                "  ██║     █████╗  ██║  ███╗███████║██║     ",
-                "  ██║     ██╔══╝  ██║   ██║██╔══██║██║     ",
-                "  ███████╗███████╗╚██████╔╝██║  ██║███████╗",
-                "  ╚══════╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝",
-            };
-            Color a = Rgb(0xFF4D4D), b = Rgb(0xFFBA30);
-            for (int i = 0; i < arte.Length; i++)
-            {
-                double f = (double)i / (arte.Length - 1);
-                var c = Color.FromRgb((byte)(a.R + (b.R - a.R) * f), (byte)(a.G + (b.G - a.G) * f), (byte)(a.B + (b.B - a.B) * f));
-                Linea(new Tramo(arte[i], c, true));
-            }
             Linea(new Tramo("  CONSULTOR-LEGAL ", Naranja, true), new Tramo("v" + version, Cian));
             Linea(new Tramo("  consultas avanzadas a bravo47 (MCP)", Tenue));
             Linea(new Tramo("", Texto));
@@ -92,7 +74,7 @@ namespace ConsultorLegal
                 _rtb.Dispatcher.BeginInvoke(new Action(() => Linea(tramos)));
                 return;
             }
-            var p = new Paragraph { Margin = new Thickness(0), LineHeight = 15 };
+            var p = new Paragraph { Margin = new Thickness(0), LineHeight = 16 };
             foreach (var t in tramos)
             {
                 var run = new Run(t.Texto) { Foreground = new SolidColorBrush(t.Color) };

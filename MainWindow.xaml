@@ -200,7 +200,7 @@
                     </DockPanel>
                     <RichTextBox x:Name="TxtLog" DockPanel.Dock="Top" Margin="0,8,0,0"
                                  BorderThickness="0" IsReadOnly="True"
-                                 FontFamily="Consolas" FontSize="12"
+                                 FontFamily="Consolas" FontSize="13"
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Disabled"/>
                 </DockPanel>
