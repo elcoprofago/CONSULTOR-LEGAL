@@ -9,5 +9,6 @@
 - [ ] **5.** En la rueda (⚙) elegir "Con textura", cargar una imagen y comprobar que el fondo cambia.
 - [ ] **6.** Pulsar "Desacoplar" en el Log, mover la ventana, cerrar la app y volver a abrirla: el log tiene que aparecer donde quedó.
 - [ ] **7.** Hacer una consulta y pulsar "Limpiar resultados": el panel tiene que quedar vacío y los botones Atrás, Fragmento y Página desactivados.
+- [ ] **8.** Buscar fallos con voces (por ejemplo "SENTENCIA DEFINITIVA"): en las tarjetas, esas voces y las palabras del texto buscado tienen que verse resaltadas en amarillo.
 
 ## Hecho

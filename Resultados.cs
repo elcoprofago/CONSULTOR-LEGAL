@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
@@ -58,6 +59,7 @@ namespace ConsultorLegal
             PanelResultados.Children.Clear();
             _textoActual.Clear();
             _seleccion = "";
+            _resaltar = TerminosBuscados(llamada.Argumentos);
             string tituloHerr = _herramientas.TryGetValue(llamada.Herramienta, out var h) ? h.Titulo : llamada.Herramienta;
             BtnAtras.IsEnabled = _historial.Count > 1;
 
@@ -348,6 +350,54 @@ namespace ConsultorLegal
             return lista;
         }
 
+        // Voces de la consulta que se resaltan en los resultados: las frases
+        // de "voces" enteras y las palabras de "query" (sin las cortas, que
+        // son artículos y conectores: de, la, o, y...).
+        private List<string> _resaltar = new();
+        private static readonly Brush FondoResalte = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x82));
+
+        private static List<string> TerminosBuscados(JsonObject args)
+        {
+            var lista = new List<string>();
+            void Frases(JsonNode? n)
+            {
+                if (n is JsonArray a) foreach (var x in a) Frases(x);
+                else if (n is JsonValue v && v.TryGetValue<string>(out var t))
+                    foreach (var f in t.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        lista.Add(f);
+            }
+            Frases(args["voces"]);
+            if (args["query"] is JsonValue q && q.TryGetValue<string>(out var query))
+                foreach (var w in query.Split(new[] { ' ', ',', ';', '"', '(', ')' }, StringSplitOptions.RemoveEmptyEntries))
+                    if (w.Length >= 4 && !w.StartsWith("-")) lista.Add(w.Trim('*'));
+            return lista.Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderByDescending(t => t.Length).ToList();
+        }
+
+        // Parte el texto en tramos normales y resaltados, sin distinguir
+        // mayúsculas ni tildes ("sentencia" encuentra "SENTENCIA" y "sentencía").
+        private static void AgregarConResalte(InlineCollection destino, string texto, List<string> terminos)
+        {
+            var ci = System.Globalization.CultureInfo.GetCultureInfo("es-AR").CompareInfo;
+            const System.Globalization.CompareOptions op = System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace;
+            int pos = 0;
+            while (pos < texto.Length && terminos.Count > 0)
+            {
+                int mejor = -1, largo = 0;
+                foreach (var t in terminos)
+                {
+                    int i = ci.IndexOf(texto.AsSpan(pos), t.AsSpan(), op, out int len);
+                    if (i >= 0) i += pos;
+                    if (i >= 0 && (mejor < 0 || i < mejor || (i == mejor && len > largo))) { mejor = i; largo = len; }
+                }
+                if (mejor < 0) break;
+                if (mejor > pos) destino.Add(new Run(texto[pos..mejor]));
+                destino.Add(new Run(texto.Substring(mejor, largo)) { Background = FondoResalte, FontWeight = FontWeights.SemiBold });
+                pos = mejor + largo;
+            }
+            if (pos < texto.Length) destino.Add(new Run(texto[pos..]));
+        }
+
         private void AgregarTarjeta(string titulo, string cuerpo, List<(string texto, string ayuda, Action accion)>? acciones,
                                     bool esError = false, bool esMeta = false, string? refNorma = null, string? articulo = null)
         {
@@ -361,11 +411,15 @@ namespace ConsultorLegal
                 Margin = new Thickness(0, 0, 0, 4),
             });
 
-            // TextBox de solo lectura: el texto se puede seleccionar y copiar,
-            // y la selección alimenta "Verificar cita seleccionada".
-            var caja = new TextBox
+            // RichTextBox de solo lectura: el texto se puede seleccionar y copiar,
+            // la selección alimenta "Verificar cita seleccionada", y las voces
+            // buscadas se resaltan.
+            var parrafo = new Paragraph { Margin = new Thickness(0) };
+            AgregarConResalte(parrafo.Inlines, cuerpo, esMeta ? new List<string>() : _resaltar);
+            var caja = new RichTextBox
             {
-                Text = cuerpo, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, BorderThickness = new Thickness(0),
+                Document = new FlowDocument(parrafo) { PagePadding = new Thickness(0) },
+                IsReadOnly = true, IsDocumentEnabled = true, BorderThickness = new Thickness(0),
                 Background = Brushes.Transparent, Foreground = esMeta ? TintaTenue : TintaPapel,
                 FontSize = esMeta ? _settings.TamanoFuenteResultados - 1 : _settings.TamanoFuenteResultados,
                 FontFamily = new FontFamily("Segoe UI"), Padding = new Thickness(0), CaretBrush = TintaPapel,
@@ -373,8 +427,8 @@ namespace ConsultorLegal
             };
             caja.SelectionChanged += (_, _) =>
             {
-                if (caja.SelectionLength == 0) return;
-                _seleccion = caja.SelectedText;
+                if (caja.Selection.IsEmpty) return;
+                _seleccion = caja.Selection.Text;
                 _seleccionRef = refNorma;
                 _seleccionArticulo = articulo;
             };
