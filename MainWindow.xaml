@@ -71,9 +71,17 @@
                         <TextBlock Text="CPU" HorizontalAlignment="Center" Foreground="{StaticResource TextDim}" FontSize="10"/>
                         <local:PerfCircle x:Name="CircleCpu"/>
                     </StackPanel>
-                    <StackPanel Orientation="Vertical" Margin="6,0">
-                        <TextBlock Text="GPU" HorizontalAlignment="Center" Foreground="{StaticResource TextDim}" FontSize="10"/>
-                        <local:PerfCircle x:Name="CircleGpu"/>
+                    <StackPanel x:Name="PanelLuz" Orientation="Vertical" Margin="6,0"
+                                ToolTip="Conexión con bravo47 y con JUBA. Se enciende en rojo si alguno no responde (caído o en mantenimiento).">
+                        <TextBlock Text="RED" HorizontalAlignment="Center" Foreground="{StaticResource TextDim}" FontSize="10"/>
+                        <Grid Width="56" Height="56">
+                            <Image Source="Assets/luz_apagada.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                            <Image x:Name="ImgLuzRoja" Source="Assets/luz_roja.png" Stretch="Uniform" Opacity="0"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Grid>
+                        <TextBlock x:Name="TxtLuz" Text="–" Width="64" HorizontalAlignment="Center" TextAlignment="Center"
+                                   FontFamily="Segoe UI" FontSize="10" FontWeight="SemiBold" Foreground="White"
+                                   TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

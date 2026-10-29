@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Management;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -44,8 +45,8 @@ namespace ConsultorLegal
         private DispatcherTimer? _perfTimer;
         private TimeSpan _lastCpuTime = TimeSpan.Zero;
         private DateTime _lastSampleTime = DateTime.MinValue;
-        private ulong _lastGpuRaw = 0;
-        private ulong _lastGpuTimeStamp = 0;
+        private DispatcherTimer? _redTimer;
+        private bool _chequeandoRed;
 
         private GridLength? _colLogGuardado;
         private GridLength? _colFormGuardado;
@@ -59,6 +60,7 @@ namespace ConsultorLegal
         public MainWindow()
         {
             InitializeComponent();
+            Actualizador.LimpiarRestos();
             _settings = CargarSettings();
             _log = new Consola(TxtLog);
 
@@ -68,8 +70,9 @@ namespace ConsultorLegal
             TxtEndpoint.Text = _settings.Endpoint;
             TxtComando.Text = McpClient.ComandoClaudeCode(_settings.Endpoint);
 
-            foreach (var c in new[] { CircleRam, CircleCpu, CircleGpu }) { c.SetSize(56); c.SetCircle(0, "–"); }
+            foreach (var c in new[] { CircleRam, CircleCpu }) { c.SetSize(56); c.SetCircle(0, "–"); }
             SetupPerfTimer();
+            SetupRedTimer();
 
             PreviewKeyDown += (_, e) =>
             {
@@ -712,7 +715,7 @@ namespace ConsultorLegal
             ScrollResultados.Visibility = json ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        // ===================== Rendimiento (semáforo RAM/CPU/GPU) =====================
+        // ===================== Rendimiento (semáforo RAM/CPU) =====================
 
         private void SetupPerfTimer()
         {
@@ -766,16 +769,6 @@ namespace ConsultorLegal
             }
             _lastCpuTime = totalCpu;
             _lastSampleTime = now;
-
-            try
-            {
-                double gpu = GetGpuPercent(pids);
-                CircleGpu.SetCircle(Math.Clamp(gpu, 0.0, 100.0), $"GPU {gpu:F1}%");
-            }
-            catch
-            {
-                CircleGpu.SetCircle(0, "GPU --");
-            }
         }
 
         // Recorre Win32_Process una sola vez y arma el árbol para encontrar todos
@@ -815,55 +808,56 @@ namespace ConsultorLegal
             return pids;
         }
 
-        // Win32_PerfRawData_GPUPerformanceCounters_GPUEngine expone el uso de GPU
-        // por proceso; el campo "Name" tiene formato pid_XXXX_luid_..._engtype_3D.
-        private double GetGpuPercent(List<int> pids)
+        // ===================== Luz de conexión (bravo47 y JUBA) =====================
+
+        private void SetupRedTimer()
         {
-            ulong sumRunningTime = 0;
-            ulong sumTimeStamp = 0;
-            int count = 0;
-
-            using var searcher = new ManagementObjectSearcher(
-                "SELECT Name, RunningTime, TimeStamp_Sys100NS FROM Win32_PerfRawData_GPUPerformanceCounters_GPUEngine");
-
-            foreach (ManagementObject obj in searcher.Get())
-            {
-                string name = obj["Name"]?.ToString() ?? "";
-                if (!pids.Contains(ExtractPidFromName(name))) continue;
-
-                if (!name.Contains("engtype_3D", StringComparison.OrdinalIgnoreCase) &&
-                    !name.Contains("engtype_Compute", StringComparison.OrdinalIgnoreCase) &&
-                    !name.Contains("engtype_VideoDecode", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                sumRunningTime += Convert.ToUInt64(obj["RunningTime"]);
-                sumTimeStamp = Math.Max(sumTimeStamp, Convert.ToUInt64(obj["TimeStamp_Sys100NS"]));
-                count++;
-            }
-
-            if (count == 0) return 0;
-
-            double gpuPercent = 0;
-            if (_lastGpuTimeStamp > 0 && sumTimeStamp > _lastGpuTimeStamp)
-            {
-                double deltaRunning = sumRunningTime - _lastGpuRaw;
-                double deltaTimestamp = sumTimeStamp - _lastGpuTimeStamp;
-                gpuPercent = Math.Clamp(deltaRunning / deltaTimestamp * 100.0, 0.0, 100.0);
-            }
-            _lastGpuRaw = sumRunningTime;
-            _lastGpuTimeStamp = sumTimeStamp;
-            return gpuPercent;
+            _redTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _redTimer.Tick += async (_, _) => await ChequearRedAsync();
+            _redTimer.Start();
+            _ = ChequearRedAsync();
         }
 
-        private static int ExtractPidFromName(string name)
+        // Apagada = todo responde; roja titilando = bravo47 o JUBA no responden.
+        private async Task ChequearRedAsync()
         {
-            const string prefix = "pid_";
-            int start = name.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
-            if (start < 0) return -1;
-            start += prefix.Length;
-            int end = name.IndexOf('_', start);
-            if (end < 0) end = name.Length;
-            return int.TryParse(name[start..end], out int pid) ? pid : -1;
+            if (_chequeandoRed) return;
+            _chequeandoRed = true;
+            try
+            {
+                var bravo = ServidorDisponibleAsync(TxtEndpoint.Text.Trim());
+                var juba = JubaTcp.DisponibleAsync();
+                await Task.WhenAll(bravo, juba);
+                var caidos = new List<string>();
+                if (!bravo.Result) caidos.Add("bravo47");
+                if (!juba.Result) caidos.Add("JUBA");
+                TxtLuz.Text = caidos.Count == 0 ? "En línea" : "Sin " + string.Join(" ni ", caidos);
+                PanelLuz.ToolTip = caidos.Count == 0
+                    ? $"bravo47 y JUBA responden (comprobado {DateTime.Now:HH:mm})."
+                    : $"No responde: {string.Join(" y ", caidos)} (comprobado {DateTime.Now:HH:mm}). Puede estar caído o en mantenimiento.";
+                EncenderLuz(caidos.Count > 0);
+            }
+            finally { _chequeandoRed = false; }
+        }
+
+        // Cualquier respuesta HTTP que no sea un error del servidor cuenta como "en línea":
+        // un GET al endpoint MCP suele devolver 405, y eso ya prueba que está atendiendo.
+        private static async Task<bool> ServidorDisponibleAsync(string endpoint)
+        {
+            try
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+                using var r = await http.GetAsync(endpoint, HttpCompletionOption.ResponseHeadersRead);
+                return (int)r.StatusCode < 500;
+            }
+            catch { return false; }
+        }
+
+        private void EncenderLuz(bool encendida)
+        {
+            if (!encendida) { ImgLuzRoja.BeginAnimation(OpacityProperty, null); ImgLuzRoja.Opacity = 0; return; }
+            ImgLuzRoja.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromSeconds(0.5))
+            { AutoReverse = true, RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
         }
 
         // ===================== Paneles colapsables =====================

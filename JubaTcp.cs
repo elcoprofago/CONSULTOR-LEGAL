@@ -36,6 +36,19 @@ namespace ConsultorLegal
 
         public static bool EsPropia(string herramienta) => herramienta is Buscar or Leer;
 
+        // JUBA en mantenimiento suele responder 200 con otra página: se exige el formulario de búsqueda.
+        public static async Task<bool> DisponibleAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                using var http = NuevoCliente();
+                http.Timeout = TimeSpan.FromSeconds(20);
+                return (await http.GetStringAsync(Base + "Busquedas.aspx", ct)).Contains("txtExpresionBusquedaIntegral");
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return false; }
+            catch (HttpRequestException) { return false; }
+        }
+
         public static IEnumerable<Herramienta> Herramientas()
         {
             var buscar = ConsultorLegal.Herramientas.Desde(new JsonObject

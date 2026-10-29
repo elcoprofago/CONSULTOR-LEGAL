@@ -60,6 +60,21 @@
             </StackPanel>
         </Border>
 
+        <!-- ===================== Actualización ===================== -->
+        <TextBlock Text="Actualización" Style="{StaticResource SectionHeader}"/>
+        <Border Background="{StaticResource PanelBg}" CornerRadius="4" Padding="10" Margin="0,6,0,14">
+            <StackPanel>
+                <DockPanel>
+                    <Button x:Name="BtnActualizar" DockPanel.Dock="Right" Content="Buscar actualización" Padding="10,4"
+                            Margin="8,0,0,0" Click="BtnActualizar_Click"
+                            ToolTip="Busca en GitHub (elcoprofago/CONSULTOR-LEGAL) si hay una versión más nueva y la instala"/>
+                    <TextBlock x:Name="TxtVersion" VerticalAlignment="Center" Foreground="{StaticResource TextDim}"/>
+                </DockPanel>
+                <TextBlock x:Name="TxtEstadoActualizacion" Margin="0,6,0,0" Foreground="{StaticResource TextDim}" FontStyle="Italic"
+                           TextWrapping="Wrap" Visibility="Collapsed"/>
+            </StackPanel>
+        </Border>
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Guardar" Style="{StaticResource ConsultarButtonStyle}" Click="BtnGuardar_Click" IsDefault="True"/>
             <Button Content="Cancelar" IsCancel="True" Margin="0"/>

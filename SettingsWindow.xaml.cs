@@ -13,6 +13,7 @@ namespace ConsultorLegal
         public SettingsWindow(AppSettings actual)
         {
             InitializeComponent();
+            TxtVersion.Text = $"Versión instalada: {Actualizador.VersionActual}";
             // Se trabaja sobre una copia: Cancelar no toca la configuración viva.
             _copia = JsonSerializer.Deserialize<AppSettings>(JsonSerializer.Serialize(actual)) ?? new AppSettings();
 
@@ -59,6 +60,61 @@ namespace ConsultorLegal
         private void SldFuente_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (TxtFuente != null) TxtFuente.Text = e.NewValue.ToString("0");
+        }
+
+        private async void BtnActualizar_Click(object sender, RoutedEventArgs e)
+        {
+            BtnActualizar.IsEnabled = false;
+            TxtEstadoActualizacion.Visibility = Visibility.Visible;
+            var progreso = new Progress<string>(s => TxtEstadoActualizacion.Text = s);
+            try
+            {
+                TxtEstadoActualizacion.Text = "Consultando GitHub...";
+                var r = await Actualizador.ConsultarUltimaAsync();
+                if (r.Version <= Actualizador.VersionActual)
+                {
+                    TxtEstadoActualizacion.Text = $"Ya tenés la última versión ({Actualizador.VersionActual}).";
+                    return;
+                }
+
+                if (!Actualizador.EsEjecutablePublicado)
+                {
+                    TxtEstadoActualizacion.Text = $"Hay una versión nueva ({r.Version}), pero esta copia corre desde la compilación de desarrollo: " +
+                                                  $"la actualización automática es sólo para el CONSULTOR-LEGAL.exe publicado. Descarga: {r.UrlPagina}";
+                    return;
+                }
+
+                string notas = string.IsNullOrWhiteSpace(r.Notas) ? "" : $"\n\n{r.Notas.Trim()}";
+                var ok = MessageBox.Show(this,
+                    $"Hay una versión nueva: {r.Version} (instalada: {Actualizador.VersionActual}).{notas}\n\n" +
+                    "¿Descargarla e instalarla? CONSULTOR-LEGAL se va a reiniciar; la configuración no se toca.",
+                    "Actualizar CONSULTOR-LEGAL", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (ok != MessageBoxResult.Yes)
+                {
+                    TxtEstadoActualizacion.Text = $"Versión {r.Version} disponible (no instalada).";
+                    return;
+                }
+
+                string exeNuevo = await Actualizador.DescargarYVerificarAsync(r, progreso);
+                TxtEstadoActualizacion.Text = "Instalando...";
+                string exeActual = Actualizador.ExeActual;
+                Actualizador.Instalar(exeNuevo, exeActual);
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exeActual)
+                {
+                    WorkingDirectory = Path.GetDirectoryName(exeActual)!,
+                    UseShellExecute = false,
+                });
+                Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                TxtEstadoActualizacion.Text = $"No se pudo actualizar: {ex.Message}";
+            }
+            finally
+            {
+                BtnActualizar.IsEnabled = true;
+            }
         }
 
         private void BtnGuardar_Click(object sender, RoutedEventArgs e)
